@@ -47,6 +47,7 @@ func DBinit() {
 	fmt.Println("init db implementation")
 }
 
+//InsertKey allows you to insert a new to key to the db
 func InsertKey(key string, value string, fileType int) (result bool, err error) {
 	if keysStore.data == nil {
 		return false, errors.New("keysStore is null, Did you initialize the db?")
@@ -87,4 +88,8 @@ func InsertKey(key string, value string, fileType int) (result bool, err error) 
 	}
 	fmt.Println("finish inserting")
 	return true, nil
+}
+
+func recoverMemTableFromFiles() {
+
 }

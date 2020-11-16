@@ -3,7 +3,7 @@
 ```
 Should allow storing at least 1 mb values, that can be accesible by multiple machines.
 ```
-# TODO
+# Ideas for implementation
 
 ```
 build api for inserting, deleting and getting by key
@@ -12,4 +12,5 @@ how to better lookup the keys --> implement an index, read?
 how to better write the key/value --> insert in batches
 handle concurrent accesses --> mutex, locks --> lockfree algo?
 values can be of different types, not just primitives (arrays, maps, etc. )
+recreate index base on files --> implement as a background job
 ```
