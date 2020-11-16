@@ -23,17 +23,14 @@ func addKey(c *gin.Context) {
 	var data RequestJSON
 	err := c.BindJSON(&data)
 	if err != nil {
+		fmt.Printf("%v error %v", c, err)
 		c.JSON(400, gin.H{
 			"message": "Data is bad formatted it should be a json with fields key and value",
 		})
+		return
 	}
-	result, err := db.InsertKey(data.Key, data.Value, db.Primitive)
-	if !result {
-		c.JSON(500, gin.H{
-			"message": "Server internal error",
-			"error":   fmt.Sprintf("%v", err),
-		})
-	}
+	go db.InsertKey(data.Key, data.Value, db.Primitive)
+	fmt.Println("returninig")
 	c.JSON(200, gin.H{
 		"message": fmt.Sprintf("Added key %v with value %v", data.Key, data.Value),
 	})

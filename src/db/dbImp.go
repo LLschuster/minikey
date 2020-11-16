@@ -12,8 +12,11 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
 	"strconv"
+	"sync"
+	"time"
 )
 
 const (
@@ -21,12 +24,19 @@ const (
 	Blob
 )
 
-var memtable map[string]string = nil
+type memtable struct {
+	data      map[string]string
+	mutex     *sync.Mutex
+	lockowner int
+}
+
+var mutex sync.Mutex
+var keysStore memtable = memtable{nil, &mutex, 0}
 
 //DBinit is the database implementation
 func DBinit() {
-	memtable = make(map[string]string)
-	memtable["offset"] = fmt.Sprintf("%d", 0)
+	keysStore.data = make(map[string]string)
+	keysStore.data["offset"] = fmt.Sprintf("%d", 0)
 
 	file, err := os.Create("files/keyvalue.txt")
 	if err != nil {
@@ -38,9 +48,21 @@ func DBinit() {
 }
 
 func InsertKey(key string, value string, fileType int) (result bool, err error) {
-	if memtable == nil {
-		return false, errors.New("Memtable is null, Did you initialize the db?")
+	if keysStore.data == nil {
+		return false, errors.New("keysStore is null, Did you initialize the db?")
 	}
+
+	requestID := rand.Intn(999999) + 2
+	keysStore.mutex.Lock()
+	keysStore.lockowner = requestID
+	unlockTable := func() {
+		if requestID == keysStore.lockowner {
+			keysStore.lockowner = 0
+			keysStore.mutex.Unlock()
+		}
+	}
+	defer unlockTable()
+	time.AfterFunc(10*time.Second, unlockTable)
 
 	if fileType == Primitive {
 		file, err := os.OpenFile("files/keyvalue.txt", os.O_RDWR, 0644)
@@ -50,7 +72,7 @@ func InsertKey(key string, value string, fileType int) (result bool, err error) 
 		}
 		defer file.Close()
 
-		offset, err := strconv.ParseInt(memtable["offset"], 10, 64)
+		offset, err := strconv.ParseInt(keysStore.data["offset"], 10, 64)
 
 		contentLen, err := file.WriteAt([]byte(fmt.Sprintf("%s\n", value)), offset)
 		if err != nil {
@@ -58,11 +80,11 @@ func InsertKey(key string, value string, fileType int) (result bool, err error) 
 			panic(fmt.Sprintf("Could not write new key : %v", err))
 		}
 
-		memtable[key] = fmt.Sprintf("%d|%d", offset, contentLen)
+		keysStore.data[key] = fmt.Sprintf("%d|%d", offset, contentLen)
 
 		offset += int64(contentLen)
-		memtable["offset"] = fmt.Sprintf("%d", offset)
+		keysStore.data["offset"] = fmt.Sprintf("%d", offset)
 	}
-
+	fmt.Println("finish inserting")
 	return true, nil
 }
