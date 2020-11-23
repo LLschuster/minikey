@@ -15,9 +15,12 @@ import (
 	"log"
 	"math/rand"
 	"os"
-	"strconv"
+	"os/exec"
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 const (
@@ -36,7 +39,7 @@ var keysStore memtable = memtable{nil, &mutex, 0}
 
 //DBinit is the database implementation
 func DBinit() {
-	keysStore.data = RecoverMemTableFromFiles() //make(map[string]string)
+	keysStore.data = make(map[string]string)
 	keysStore.data["offset"] = fmt.Sprintf("%d", 0)
 
 	file, err := os.OpenFile("files/keyvalue.txt", os.O_RDWR, 0644)
@@ -67,28 +70,64 @@ func InsertKey(key string, value string, fileType int) (result bool, err error) 
 	time.AfterFunc(10*time.Second, unlockTable)
 
 	if fileType == Primitive {
-		file, err := os.OpenFile("files/keyvalue.txt", os.O_RDWR, 0644)
+		file, fileName, err := getCurrentFile()
 		if err != nil {
 			fmt.Printf("%v ", err)
 			panic("keyvalue file could not be open")
 		}
 		defer file.Close()
 
-		offset, err := strconv.ParseInt(keysStore.data["offset"], 10, 64)
+		offset := getFileSize(file)
 
-		contentLen, err := file.WriteAt([]byte(fmt.Sprintf("%s:%s\n", key, value)), offset)
+		contentLen, err := file.Write([]byte(fmt.Sprintf("%s:%s:%s\n", key, value, fileName)))
 		if err != nil {
 			fmt.Printf("%v ", err)
 			panic(fmt.Sprintf("Could not write new key : %v", err))
 		}
 
-		keysStore.data[key] = fmt.Sprintf("%d|%d", offset, contentLen)
+		keysStore.data[key] = fmt.Sprintf("%s|%d|%d", fileName, offset, contentLen)
 
-		offset += int64(contentLen)
-		keysStore.data["offset"] = fmt.Sprintf("%d", offset)
 	}
 	fmt.Println("finish inserting")
 	return true, nil
+}
+
+func getCurrentFile() (*os.File, string, error) {
+	cmd := exec.Command("ls", "-c", "files")
+	queryFileNames, err := cmd.Output()
+	if err != nil {
+		fmt.Printf("error %v", err)
+		return nil, "", errors.New("Could not get a valid file")
+	}
+
+	fileNames := strings.Split(string(queryFileNames), " ")
+	fmt.Printf("%v %v \n", fileNames, queryFileNames)
+
+	for _, fileName := range fileNames {
+		fmt.Printf("%v", fileName)
+		file, err := os.OpenFile(fmt.Sprintf("files/%s", fileName), os.O_APPEND, 0644)
+		if err != nil {
+			continue
+		}
+
+		size := getFileSize(file)
+
+		if size < 200 {
+			return file, fileName, nil
+		}
+	}
+
+	newFileName := uuid.New()
+	file, err := os.Create(fmt.Sprintf("files/%s", newFileName.String()))
+	if err != nil {
+		return nil, "", errors.New("Could not create new file")
+	}
+	return file, newFileName.String(), nil
+}
+
+func getFileSize(file *os.File) int64 {
+	finfo, _ := file.Stat()
+	return finfo.Size()
 }
 
 //RecoverMemTableFromFiles will take the files on disk
