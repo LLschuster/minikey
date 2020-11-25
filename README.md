@@ -14,3 +14,12 @@ handle concurrent accesses --> mutex, locks --> lockfree algo?
 values can be of different types, not just primitives (arrays, maps, etc. )
 recreate index base on files --> implement as a background job
 ```
+
+# Benchmark
+
+```
+base on 2000 calls
+
+Insertions: ~ 40.12 seconds
+reads: ~ 24.41 seconds
+```

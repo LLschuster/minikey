@@ -16,6 +16,7 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -34,6 +35,11 @@ type memtable struct {
 	lockowner int
 }
 
+type ReadKeyResponse struct {
+	Value string
+	Err   error
+}
+
 var mutex sync.Mutex
 var keysStore memtable = memtable{nil, &mutex, 0}
 
@@ -49,6 +55,33 @@ func DBinit() {
 	}
 	file.Close()
 	fmt.Println("init db implementation")
+}
+
+func GetKey(key string, c chan ReadKeyResponse) {
+	if keysStore.data == nil {
+		c <- ReadKeyResponse{"", errors.New("keysStore is null, Did you initialize the db?")}
+	}
+
+	if value, ok := keysStore.data[key]; ok == true {
+		fileMetadata := strings.Split(value, "|")
+		fileName := fileMetadata[0]
+		contentOffset, _ := strconv.ParseInt(fileMetadata[1], 10, 32)
+		contentLen, _ := strconv.ParseInt(fileMetadata[2], 10, 64)
+
+		file, err := os.OpenFile(fmt.Sprintf("files/%s", fileName), os.O_RDWR, 0644)
+		if err != nil {
+			c <- ReadKeyResponse{"", errors.New("error opening the db")}
+		}
+		readBuffer := make([]byte, contentLen)
+		lines, _ := file.ReadAt(readBuffer, contentOffset)
+		if lines <= 0 {
+			c <- ReadKeyResponse{"", errors.New("error opening the db")}
+		}
+		c <- ReadKeyResponse{string(readBuffer), nil}
+
+	}
+
+	c <- ReadKeyResponse{"", errors.New("This key is not present in the database")}
 }
 
 //InsertKey allows you to insert a new to key to the db

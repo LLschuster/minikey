@@ -38,8 +38,18 @@ func addKey(c *gin.Context) {
 
 func getKey(c *gin.Context) {
 	key := c.Param("key")
+	ch := make(chan db.ReadKeyResponse)
+	go db.GetKey(key, ch)
+	response := <-ch
+	if response.Err != nil {
+		c.JSON(500, gin.H{
+			"Error": fmt.Sprintf("%s", response.Err),
+		})
+		return
+	}
 	c.JSON(200, gin.H{
 		"message": fmt.Sprintf("got key %s ", key),
+		"value":   response.Value,
 	})
 }
 
